@@ -1,41 +1,6 @@
 #!/usr/bin/python
 #
-# There is a helper script to get your access_token and refresh token.
-#
-# You must first register at the google developer console and get a
-# client id and secret.
-#
-# Do that at: https://console.developers.google.com
-#
-# Create a new project
-#
-# Use get_google_oauth_tokens.py:
-#  1. Run script with your client_id and client_secret
-#  2. Go to the url it gives you
-#  3. Log in
-#  4. Paste auth code into script
-#  5. It will give you the token values
-#  6. Put those tokens in the json file this script uses
-#
-# Read the credentials info from a file that is formatted like so:
-#
-# {
-#   "country_code": "1",
-#   "dialout_prefix": "9",
-#   "users":
-#     "user@domain.com": {
-#       "client_id": "...",
-#       "client_secret": "...",
-#       "scope": "https://www.googleapis.com/auth/contacts.readonly",
-#       "user_agent": "python2",
-#       "access_token": "...",
-#       "refresh_token": "..."
-#     },
-#     "anotheruser@domain.com": {
-#       ...
-#     }
-#   }
-# }
+# See README.md for configuration information
 
 import atom
 import json
@@ -44,30 +9,38 @@ import sys
 import os
 import gdata.contacts.client
 
-CONFIG_FILE = "/etc/asterisk-scripts/client_secrets.json"
+OAUTH_CONFIG_FILE = "/etc/asterisk-scripts/client_secrets.json"
+USER_CONFIG_FILE = "/etc/asterisk-scripts/user_config.json"
 
-def main():
-  # load the configuration
+def read_config( filename ):
   try:
-    with open( CONFIG_FILE ) as f:
-      configuration = json.load( f )
+    with open( filename ) as f:
+      config = json.load( f )
   except ValueError as e:
-    print "Parse Error (file: \'%s\'): %s" % ( CONFIG_FILE, e )
+    print "Parse Error (file: \'%s\'): %s" % ( filename, e )
     sys.exit()
   except IOError as e:
     print "Error reading configuration: %s" % ( e )
     sys.exit()
 
-  # delete all of our contacts before we refetch them, this will allow deletions
+  return config
+
+
+def main():
+  # load the configurations
+  oauth_config = read_config( OAUTH_CONFIG_FILE )
+  user_config = read_config( USER_CONFIG_FILE )
+
+  # remove old cid data from asterisk db
   os.system( "asterisk -rx \'database deltree cidname\'" )
 
-  for user_username, user_dict in configuration['users'].items():
+  for user_username, user_dict in user_config['users'].items():
     # OAuth2
     g_client = gdata.contacts.client.ContactsClient()
-    oauth2_creds = gdata.gauth.OAuth2Token( client_id=user_dict['client_id'],
-                                            client_secret=user_dict['client_secret'],
-                                            scope=user_dict['scope'],
-                                            user_agent=user_dict['user_agent'],
+    oauth2_creds = gdata.gauth.OAuth2Token( client_id=oauth_config['client_id'],
+                                            client_secret=oauth_config['client_secret'],
+                                            scope=oauth_config['scope'],
+                                            user_agent=oauth_config['user_agent'],
                                             access_token=user_dict['access_token'],
                                             refresh_token=user_dict['refresh_token'] )
     oauth2_creds.authorize( g_client )
@@ -82,10 +55,10 @@ def main():
       for phone in entry.phone_number:
         phone.text = re.sub('\D', '', phone.text)
 
-        if configuration['country_code'] != "":
-          phone.text = re.sub( '^\+?%s' % configuration['country_code'], '', phone.text )
+        if user_config['country_code'] != "":
+          phone.text = re.sub( '^\+?%s' % user_config['country_code'], '', phone.text )
 
-        os.system( "asterisk -rx \'database put cidname +%s%s \"%s\"\'" % ( configuration['country_code'], phone.text, entry.title.text ) )
+        os.system( "asterisk -rx \'database put cidname +%s%s \"%s\"\'" % ( user_config['country_code'], phone.text, entry.title.text ) )
 
 
 if __name__ == "__main__":

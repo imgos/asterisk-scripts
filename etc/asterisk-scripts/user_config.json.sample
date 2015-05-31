@@ -1,0 +1,10 @@
+{
+  "country_code": "1",
+  "dialout_prefix": "9",
+  "users": {
+    "user@domain.com": {
+      "access_token": "",
+      "refresh_token": ""
+    }
+  }
+}
