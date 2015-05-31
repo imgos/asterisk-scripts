@@ -1,0 +1,8 @@
+<CiscoIPPhoneMenu>
+  <Title>[Your Company] Directory</Title>
+  <Prompt>Select to see directory</Prompt>
+  <MenuItem>
+    <Name>Directory</Name>
+    <URL>http://10.0.100.3/asterisk/list0.xml</URL>
+  </MenuItem>
+</CiscoIPPhoneMenu>
