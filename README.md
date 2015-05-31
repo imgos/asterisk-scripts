@@ -1,6 +1,16 @@
 # asterisk-scripts
 A collection of convenience scripts for use with the asterisk PBX.
 
+The scripts in this repository use OAuth2.  So, yes, they will work with Google Apps accounts.
+
+## googlecontacts.py
+
+Import all of the telephone numbers from the contacts in Google accounts into the asterisk database.  Having the numbers available there, make is quick and easy to match inbound and outbound calls to a nicely-formatted name for display in caller ID, connected line information, CDR, etc.
+
+## build_xml_directory.py
+
+Import all of the phone numbers from the contacts of a Google account and format them into pages that can be served to Cisco phones as a directory.  This script will output all of the pages for the directory with the exception of the static base xml file (there is an example of that in this repo, etc/www/directory.xml).  Those files get served by an http server to the phones.  You'll just need to set the URL in the phone configuration to point to the location you are serving these files from.
+
 ## Configuration
 
 Get your Client ID and Client Secret:
