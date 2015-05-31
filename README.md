@@ -47,6 +47,13 @@ The user configuration file should be placed at "/etc/asterisk-scripts/user_conf
       "access_token": "",
       "refresh_token": ""
     }
+  },
+  "cisco_directory": {
+    "output_directory": "/var/www-unsec/asterisk/",
+    "base_url": "http://10.0.100.3/asterisk/",
+    "filename_base": "list",
+    "filename_extension": ".xml",
+    "max_entries_per_page": "32"
   }
 }
 ```

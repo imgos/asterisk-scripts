@@ -1,26 +1,6 @@
 #!/usr/bin/python
 #
-# There is a helper script to get your access_token and refresh token.
-# Use get_google_oauth_tokens.py:
-#  1. Run script with your client_id and client_secret
-#  2. Go to the url it gives you
-#  3. Log in
-#  4. Paste auth code into script
-#  5. It will give you the token values
-#  6. Put those tokens in the json file this script uses
-#
-# Read the credentials info from a file that is formatted like so:
-#
-# {
-#   "user@domain.com": {
-#     "client_id": "...",
-#     "client_secret": "...",
-#     "scope": "https://www.googleapis.com/auth/contacts.readonly",
-#     "user_agent": "python2",
-#     "access_token": "...",
-#     "refresh_token": "..."
-#   }
-# }
+# See README.md for configuration information
 
 import gdata.contacts.client
 import gdata.contacts.service
@@ -32,53 +12,43 @@ import re
 import sys
 import xml.dom.minidom
 
+OAUTH_CONFIG_FILE = "/etc/asterisk-scripts/client_secrets.json"
+USER_CONFIG_FILE = "/etc/asterisk-scripts/user_config.json"
+
+def read_config( filename ):
+  try:
+    with open( filename ) as f:
+      config = json.load( f )
+  except ValueError as e:
+    print "Parse Error (file: \'%s\'): %s" % ( filename, e )
+    sys.exit()
+  except IOError as e:
+    print "Error reading configuration: %s" % ( e )
+    sys.exit()
+
+  return config
+
+
 def main():
-  country_code = "1"
-  dialout_prefix = "9"
+  # load the configurations
+  oauth_config = read_config( OAUTH_CONFIG_FILE )
+  user_config = read_config( USER_CONFIG_FILE )
 
-  output_directory = "/var/www-unsec/asterisk/"
-  base_url = "http://10.0.100.3/asterisk/"
-  filename_base = "list"
-  filename_extension = ".xml"
-  max_entries_per_page = 32
+  for user_name, user_dict in user_config['users'].items():
+    # OAuth2
+    gd_client = gdata.contacts.client.ContactsClient()
+    oauth2_creds = gdata.gauth.OAuth2Token( client_id=oauth_config['client_id'],
+                                            client_secret=oauth_config['client_secret'],
+                                            scope=oauth_config['scope'],
+                                            user_agent=oauth_config['user_agent'],
+                                            access_token=user_dict['access_token'],
+                                            refresh_token=user_dict['refresh_token'] )
+    oauth2_creds.authorize( gd_client )
 
-  credentials = {
-                  "user@domain.com":"from_json_file",
-                }
+    query = gdata.contacts.client.ContactsQuery()
+    query.max_results = 1000
 
-  with open( '/var/lib/asterisk/extra/client_secrets.json' ) as f:
-    clients = json.load( f )
-
-  for cred_user, cred_pass in credentials.items():
-
-    if cred_pass == 'from_json_file':
-      # OAuth2
-      g_client = gdata.contacts.client.ContactsClient()
-      oauth2_creds = gdata.gauth.OAuth2Token( client_id = clients[cred_user]['client_id'],
-                                              client_secret = clients[cred_user]['client_secret'],
-                                              scope = clients[cred_user]['scope'],
-                                              user_agent = clients[cred_user]['user_agent'],
-                                              access_token = clients[cred_user]['access_token'],
-                                              refresh_token = clients[cred_user]['refresh_token'] )
-      oauth2_creds.authorize( g_client )
-
-      query = gdata.contacts.client.ContactsQuery()
-      query.max_results = 1000
-
-      feed = g_client.GetContacts( q=query )
-    else:
-      # old username/passwd way (no longer works with google apps)
-      g_client = gdata.contacts.service.ContactsService()
-      g_client.email = cred_user
-      g_client.password = cred_pass
-      g_client.source = 'gcontact2ast'
-      g_client.ssl = True
-      g_client.ProgrammaticLogin()
-
-      query = gdata.contacts.service.ContactsQuery()
-      query.max_results = 1000
-
-      feed = g_client.GetContactsFeed( query.ToUri() )
+    feed = gd_client.GetContacts( q=query )
 
     phonebook = []
 
@@ -88,34 +58,38 @@ def main():
         # Strip out any non numeric characters
         phone.text = re.sub( '\D', '', phone.text )
 
-        if country_code != "":
-          phone.text = re.sub( '^\+?%s' % country_code, '', phone.text )
+        if user_config['country_code'] != "":
+          phone.text = re.sub( '^\+?%s' % user_config['country_code'], '', phone.text )
 
-        phone.text = re.sub( '^', dialout_prefix, phone.text )
+        phone.text = re.sub( '^', user_config['dialout_prefix'], phone.text )
 
         phonebook.append( entry.title.text + ":::" + phone.text )
 
     phonebook.sort()
 
-    pages = int( math.ceil( ( len( phonebook ) + 0.0 ) / ( max_entries_per_page + 0.0 ) ) )
+    # just for convenience
+    cisco = user_config['cisco_directory']
+
+    pages = int( math.ceil( ( len( phonebook ) + 0.0 ) / ( int( cisco['max_entries_per_page'] ) + 0.0 ) ) )
 
     # remove the old phonebook if we'll be creating new pages
     # only really an issue if the new phonebook is smaller by at least one page
     if pages > 0:
-      os.chdir( output_directory )
-      files = glob.glob( "list*.xml" )
+      os.chdir( cisco['output_directory'] )
+      files = glob.glob( "%s*%s" % ( cisco['filename_base'], cisco['filename_extension'] ) )
       for f in files:
         os.remove( f )
 
     for i in range( pages ):
       create_ciscoipphonedirectory_file(
-        phonebook[ i * max_entries_per_page : ( i + 1 ) * max_entries_per_page ],
-        filename_base,
-        filename_extension,
-        output_directory,
-        base_url,
+        phonebook[ i * int( cisco['max_entries_per_page'] ) : ( i + 1 ) * int( cisco['max_entries_per_page'] ) ],
+        cisco['filename_base'],
+        cisco['filename_extension'],
+        cisco['output_directory'],
+        cisco['base_url'],
         i,
         pages )
+
 
 
 def print_dictionary( book ):
