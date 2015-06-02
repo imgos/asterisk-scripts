@@ -4,19 +4,13 @@ import gdata.gauth
 import json
 import sys
 
+import asteriskhelp
+
 CONFIG_FILE = "/etc/asterisk-scripts/client_secrets.json"
 
 def main():
 
-  try:
-    with open( CONFIG_FILE ) as f:
-      config = json.load( f )
-  except ValueError as e:
-    print "Parse Error (file: \'%s\'): %s" % ( CONFIG_FILE, e )
-    sys.exit()
-  except IOError as e:
-    print "Error reading configuration: %s" % ( e )
-    sys.exit()
+  config = asteriskhelp.read_config( CONFIG_FILE )
 
   token = gdata.gauth.OAuth2Token( client_id=config['client_id'],
                                    client_secret=config['client_secret'],

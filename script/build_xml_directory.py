@@ -12,27 +12,16 @@ import re
 import sys
 import xml.dom.minidom
 
+import asteriskhelp
+
 OAUTH_CONFIG_FILE = "/etc/asterisk-scripts/client_secrets.json"
 USER_CONFIG_FILE = "/etc/asterisk-scripts/user_config.json"
-
-def read_config( filename ):
-  try:
-    with open( filename ) as f:
-      config = json.load( f )
-  except ValueError as e:
-    print "Parse Error (file: \'%s\'): %s" % ( filename, e )
-    sys.exit()
-  except IOError as e:
-    print "Error reading configuration: %s" % ( e )
-    sys.exit()
-
-  return config
 
 
 def main():
   # load the configurations
-  oauth_config = read_config( OAUTH_CONFIG_FILE )
-  user_config = read_config( USER_CONFIG_FILE )
+  oauth_config = asteriskhelp.read_config( OAUTH_CONFIG_FILE )
+  user_config = asteriskhelp.read_config( USER_CONFIG_FILE )
 
   for user_name, user_dict in user_config['users'].items():
     # OAuth2
