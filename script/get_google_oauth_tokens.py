@@ -1,8 +1,6 @@
 #!/usr/bin/python
 
 import gdata.gauth
-import json
-import sys
 
 import asteriskhelp
 
