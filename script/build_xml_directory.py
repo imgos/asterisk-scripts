@@ -5,7 +5,6 @@
 import gdata.contacts.client
 import gdata.contacts.service
 import glob
-import json
 import math
 import os
 import re

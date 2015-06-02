@@ -1,5 +1,6 @@
 """Helper functions"""
 
+import json
 import sys
 
 def read_config( filename ):

@@ -3,7 +3,6 @@
 # See README.md for configuration information
 
 import atom
-import json
 import re
 import sys
 import os
