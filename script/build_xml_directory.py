@@ -9,6 +9,7 @@ import math
 import os
 import re
 import sys
+import unidecode
 import xml.dom.minidom
 
 import asteriskhelp
@@ -51,7 +52,8 @@ def main():
 
         phone.text = re.sub( '^', user_config['dialout_prefix'], phone.text )
 
-        phonebook.append( entry.title.text + ":::" + phone.text )
+        utf8_string = unidecode.unidecode( entry.title.text + ":::" + phone.text )
+        phonebook.append( utf8_string )
 
     phonebook.sort()
 

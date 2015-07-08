@@ -3,10 +3,11 @@
 # See README.md for configuration information
 
 import atom
+import gdata.contacts.client
+import os
 import re
 import sys
-import os
-import gdata.contacts.client
+import unidecode
 
 import asteriskhelp
 
@@ -46,7 +47,8 @@ def main():
         if user_config['country_code'] != "":
           phone.text = re.sub( '^\+?%s' % user_config['country_code'], '', phone.text )
 
-        os.system( "asterisk -rx \'database put cidname +%s%s \"%s\"\'" % ( user_config['country_code'], phone.text, entry.title.text ) )
+        utf8_string = "asterisk -rx \'database put cidname +%s%s \"%s\"\'" % ( user_config['country_code'], phone.text, entry.title.text )
+        os.system( unidecode.unidecode( utf8_string ) )
 
 
 if __name__ == "__main__":
