@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 import gdata.gauth
 
@@ -15,14 +15,14 @@ def main():
                                     scope=config['scope'],
                                     user_agent=config['user_agent'])
 
-    print token.generate_authorize_url(redirect_uri='urn:ietf:wg:oauth:2.0:oob')
+    print(token.generate_authorize_url(redirect_uri='urn:ietf:wg:oauth:2.0:oob'))
 
-    code = raw_input("Enter verification code: ").strip()
+    code = input("Enter verification code: ").strip()
 
     token.get_access_token(code)
 
-    print "\nRefresh token: %s" % (token.refresh_token)
-    print "Access Token: %s" % (token.access_token)
+    print("\nRefresh token: %s".format(token.refresh_token))
+    print("Access Token: %s".format(token.access_token))
 
 
 if __name__ == "__main__":

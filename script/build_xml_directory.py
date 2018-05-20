@@ -4,11 +4,11 @@
 
 import gdata.contacts.client
 import gdata.contacts.service
+import gdata.gauth
 import glob
 import math
 import os
 import re
-import sys
 import unidecode
 import xml.dom.minidom
 
@@ -45,12 +45,12 @@ def main():
         for i, entry in enumerate(feed.entry):
             for phone in entry.phone_number:
                 # Strip out any non numeric characters
-                phone.text = re.sub('\D', '', phone.text)
+                phone.text = re.sub(r'\D', '', phone.text)
 
                 if user_config['country_code'] != "":
-                    phone.text = re.sub('^\+?%s' % user_config['country_code'], '', phone.text)
+                    phone.text = re.sub(r'^\+?%s'.format(user_config['country_code']), '', phone.text)
 
-                phone.text = re.sub('^', user_config['dialout_prefix'], phone.text)
+                phone.text = re.sub(r'^', user_config['dialout_prefix'], phone.text)
 
                 utf8_string = unidecode.unidecode(entry.title.text + ":::" + phone.text)
                 phonebook.append(utf8_string)
@@ -66,7 +66,7 @@ def main():
         # only really an issue if the new phonebook is smaller by at least one page
         if pages > 0:
             os.chdir(cisco['output_directory'])
-            files = glob.glob("%s*%s" % (cisco['filename_base'], cisco['filename_extension']))
+            files = glob.glob("%s*%s".format(cisco['filename_base'], cisco['filename_extension']))
             for f in files:
                 os.remove(f)
 
@@ -83,7 +83,7 @@ def main():
 
 def print_dictionary(book):
     for item in book:
-        sys.stdout.write(item + "\n")
+        print(item + "\n")
 
 
 def create_ciscoipphonedirectory_file(entries, filename_base, filename_extension,
@@ -130,15 +130,15 @@ def create_ciscoipphonedirectory_file(entries, filename_base, filename_extension
 
     # end the xml document and save it
     uglyXML = directory.toprettyxml(indent='  ')
-    text_re = re.compile('>\n\s+([^<>\s].*?)\n\s+</', re.DOTALL)
-    prettyXML = text_re.sub('>\g<1></', uglyXML)
+    text_re = re.compile(r'>\n\s+([^<>\s].*?)\n\s+</', re.DOTALL)
+    prettyXML = text_re.sub(r'>\g<1></', uglyXML)
 
     filename = base_directory + filename_base + str(page_number) + filename_extension
     output_xml = open(filename, "w")
     output_xml.write(prettyXML)
-    output_xml.close
+    output_xml.close()
 
-    os.chmod(filename, 0644)
+    os.chmod(filename, 0o0644)
 
 
 def add_softkey(xml_root, root_element, name, url, position):
