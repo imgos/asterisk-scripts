@@ -20,16 +20,16 @@ from oauth2client.file import Storage
 ###
 
 
-APPLICATION_NAME = 'Asterisk DB Updater'
+APPLICATION_NAME = "Asterisk DB Updater"
 
 # If modifying these scopes, delete your previously saved credentials
 SCOPES = [
-    'https://www.googleapis.com/auth/contacts.readonly',
-    'https://www.googleapis.com/auth/people.readonly',
+    "https://www.googleapis.com/auth/contacts.readonly",
+    "https://www.googleapis.com/auth/people.readonly",
 ]
 
-OAUTH_CONFIG_FILE = '/etc/asterisk-scripts/asterisk_client_secrets.json'
-OAUTH_TOKEN_FILE = '/etc/asterisk-scripts/asterisk_script_tokens.json'
+OAUTH_CONFIG_FILE = "/etc/asterisk-scripts/asterisk_client_secrets.json"
+OAUTH_TOKEN_FILE = "/etc/asterisk-scripts/asterisk_script_tokens.json"
 
 
 ###
@@ -50,41 +50,49 @@ def get_credentials(flags):
         flow = client.flow_from_clientsecrets(OAUTH_CONFIG_FILE, SCOPES)
         flow.user_agent = APPLICATION_NAME
         credentials = tools.run_flow(flow, store, flags)
-        print('Storing credentials to: {}'.format(OAUTH_TOKEN_FILE))
+        print(f"Storing credentials to: {OAUTH_TOKEN_FILE}")
     return credentials
 
 
 def main():
-    """Update asterisk db from google contacts
-    """
+    """Update asterisk db from google contacts"""
     opts = docopt.docopt(__doc__)
-    flags = Namespace(auth_host_name='localhost',
-                      auth_host_port=[8080, 8090],
-                      logging_level='ERROR',
-                      noauth_local_webserver=opts['--noauth_local_webserver'])
+    flags = Namespace(
+        auth_host_name="localhost",
+        auth_host_port=[8080, 8090],
+        logging_level="ERROR",
+        noauth_local_webserver=opts["--noauth_local_webserver"],
+    )
 
     credentials = get_credentials(flags)
     http = credentials.authorize(httplib2.Http())
 
-    if opts['--noauth_local_webserver']:
+    if opts["--noauth_local_webserver"]:
         return
 
-    service = discovery.build('people', 'v1', http=http)
-    contacts_response = service \
-        .people() \
-        .connections() \
-        .list(resourceName='people/me',
-              personFields='names,phoneNumbers',
-              sortOrder='LAST_NAME_ASCENDING') \
+    service = discovery.build("people", "v1", http=http)
+    contacts_response = (
+        service.people()
+        .connections()
+        .list(
+            resourceName="people/me",
+            personFields="names,phoneNumbers",
+            sortOrder="LAST_NAME_ASCENDING",
+        )
         .execute()
+    )
 
-    for i, contact in enumerate(contacts_response['connections']):
-        display_name = contact['names'][0]['displayName'] if len(contact['names']) > 0 else 'Unknown'
+    for i, contact in enumerate(contacts_response["connections"]):
+        display_name = (
+            contact["names"][0]["displayName"]
+            if len(contact["names"]) > 0
+            else "Unknown"
+        )
 
-        for phone in contact['phoneNumbers']:
-            ast_cmd = 'database put cidname {} "{}"'.format(phone["canonicalForm"], display_name)
-            subprocess.run(['asterisk', '-rx', unidecode.unidecode(ast_cmd)])
+        for phone in contact["phoneNumbers"]:
+            ast_cmd = f'database put cidname {phone["canonicalForm"]} "{display_name}"'
+            subprocess.run(["asterisk", "-rx", unidecode.unidecode(ast_cmd)])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

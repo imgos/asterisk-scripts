@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 #
 # See README.md for configuration information
 
@@ -23,15 +23,17 @@ def main():
     oauth_config = asteriskhelp.read_config(OAUTH_CONFIG_FILE)
     user_config = asteriskhelp.read_config(USER_CONFIG_FILE)
 
-    for user_name, user_dict in user_config['users'].items():
+    for user_name, user_dict in user_config["users"].items():
         # OAuth2
         gd_client = gdata.contacts.client.ContactsClient()
-        oauth2_creds = gdata.gauth.OAuth2Token(client_id=oauth_config['client_id'],
-                                               client_secret=oauth_config['client_secret'],
-                                               scope=oauth_config['scope'],
-                                               user_agent=oauth_config['user_agent'],
-                                               access_token=user_dict['access_token'],
-                                               refresh_token=user_dict['refresh_token'])
+        oauth2_creds = gdata.gauth.OAuth2Token(
+            client_id=oauth_config["client_id"],
+            client_secret=oauth_config["client_secret"],
+            scope=oauth_config["scope"],
+            user_agent=oauth_config["user_agent"],
+            access_token=user_dict["access_token"],
+            refresh_token=user_dict["refresh_token"],
+        )
         oauth2_creds.authorize(gd_client)
 
         query = gdata.contacts.client.ContactsQuery()
@@ -45,12 +47,14 @@ def main():
         for i, entry in enumerate(feed.entry):
             for phone in entry.phone_number:
                 # Strip out any non numeric characters
-                phone.text = re.sub(r'\D', '', phone.text)
+                phone.text = re.sub(r"\D", "", phone.text)
 
-                if user_config['country_code'] != "":
-                    phone.text = re.sub(r'^\+?%s'.format(user_config['country_code']), '', phone.text)
+                if user_config["country_code"] != "":
+                    phone.text = re.sub(
+                        fr"^\+?{user_config['country_code']}", "", phone.text
+                    )
 
-                phone.text = re.sub(r'^', user_config['dialout_prefix'], phone.text)
+                phone.text = re.sub(r"^", user_config["dialout_prefix"], phone.text)
 
                 utf8_string = unidecode.unidecode(entry.title.text + ":::" + phone.text)
                 phonebook.append(utf8_string)
@@ -58,27 +62,34 @@ def main():
         phonebook.sort()
 
         # just for convenience
-        cisco = user_config['cisco_directory']
+        cisco = user_config["cisco_directory"]
 
-        pages = int(math.ceil((len(phonebook) + 0.0) / (int(cisco['max_entries_per_page']) + 0.0)))
+        pages = int(
+            math.ceil(
+                (len(phonebook) + 0.0) / (int(cisco["max_entries_per_page"]) + 0.0)
+            )
+        )
 
         # remove the old phonebook if we'll be creating new pages
         # only really an issue if the new phonebook is smaller by at least one page
         if pages > 0:
-            os.chdir(cisco['output_directory'])
-            files = glob.glob("%s*%s".format(cisco['filename_base'], cisco['filename_extension']))
+            os.chdir(cisco["output_directory"])
+            files = glob.glob(f"{cisco['filename_base']}*{cisco['filename_extension']}")
             for f in files:
                 os.remove(f)
 
         for i in range(pages):
+            idx_start = i * int(cisco["max_entries_per_page"])
+            idx_stop = (i + 1) * int(cisco["max_entries_per_page"])
             create_ciscoipphonedirectory_file(
-                phonebook[i * int(cisco['max_entries_per_page']): (i + 1) * int(cisco['max_entries_per_page'])],
-                cisco['filename_base'],
-                cisco['filename_extension'],
-                cisco['output_directory'],
-                cisco['base_url'],
+                phonebook[idx_start:idx_stop],
+                cisco["filename_base"],
+                cisco["filename_extension"],
+                cisco["output_directory"],
+                cisco["base_url"],
                 i,
-                pages)
+                pages,
+            )
 
 
 def print_dictionary(book):
@@ -86,8 +97,15 @@ def print_dictionary(book):
         print(item + "\n")
 
 
-def create_ciscoipphonedirectory_file(entries, filename_base, filename_extension,
-                                      base_directory, base_url, page_number, total_pages):
+def create_ciscoipphonedirectory_file(
+    entries,
+    filename_base,
+    filename_extension,
+    base_directory,
+    base_url,
+    page_number,
+    total_pages,
+):
     directory = xml.dom.minidom.Document()
     main_element = directory.createElement("CiscoIPPhoneDirectory")
     directory.appendChild(main_element)
@@ -121,17 +139,27 @@ def create_ciscoipphonedirectory_file(entries, filename_base, filename_extension
 
     # add prev/next buttons
     if page_number > 0:
-        add_softkey(directory, main_element, "Prev",
-                    base_url + filename_base + str(page_number - 1) + filename_extension, 4)
+        add_softkey(
+            directory,
+            main_element,
+            "Prev",
+            base_url + filename_base + str(page_number - 1) + filename_extension,
+            4,
+        )
 
     if page_number < total_pages - 1:
-        add_softkey(directory, main_element, "Next",
-                    base_url + filename_base + str(page_number + 1) + filename_extension, 5)
+        add_softkey(
+            directory,
+            main_element,
+            "Next",
+            base_url + filename_base + str(page_number + 1) + filename_extension,
+            5,
+        )
 
     # end the xml document and save it
-    uglyXML = directory.toprettyxml(indent='  ')
-    text_re = re.compile(r'>\n\s+([^<>\s].*?)\n\s+</', re.DOTALL)
-    prettyXML = text_re.sub(r'>\g<1></', uglyXML)
+    uglyXML = directory.toprettyxml(indent="  ")
+    text_re = re.compile(r">\n\s+([^<>\s].*?)\n\s+</", re.DOTALL)
+    prettyXML = text_re.sub(r">\g<1></", uglyXML)
 
     filename = base_directory + filename_base + str(page_number) + filename_extension
     output_xml = open(filename, "w")
