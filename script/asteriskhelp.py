@@ -9,10 +9,10 @@ def read_config(filename):
         with open(filename) as f:
             config = json.load(f)
     except ValueError as e:
-        print "Parse Error (file: \'%s\'): %s" % (filename, e)
+        print(f"Parse Error (file: '{filename}'): {e}")
         sys.exit()
     except IOError as e:
-        print "Error reading configuration: %s" % (e)
+        print(f"Error reading configuration: {e}")
         sys.exit()
 
     return config
