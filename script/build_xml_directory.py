@@ -2,11 +2,13 @@
 #
 # See README.md for configuration information
 
-import gdata.contacts.client
-import gdata.contacts.service
-import gdata.gauth
+import apiclient
 import glob
+import httplib2
 import math
+import oauth2client.client
+import oauth2client.file
+import oauth2client.tools
 import os
 import re
 import unidecode
@@ -15,81 +17,107 @@ import xml.dom.minidom
 import asteriskhelp
 
 OAUTH_CONFIG_FILE = "/etc/asterisk-scripts/client_secrets.json"
+OAUTH_TOKEN_FILE = "/etc/asterisk-scripts/asterisk_script_tokens.json"
 USER_CONFIG_FILE = "/etc/asterisk-scripts/user_config.json"
 
 
+def get_credentials():
+    """Gets valid user credentials from storage.
+
+    :return: the obtained credentials
+    """
+    store = oauth2client.file.Storage(OAUTH_TOKEN_FILE)
+    return store.get()
+
+
 def main():
-    # load the configurations
-    oauth_config = asteriskhelp.read_config(OAUTH_CONFIG_FILE)
+    credentials = get_credentials()
+    http = credentials.authorize(httplib2.Http())
+
+    service = apiclient.discovery.build("people", "v1", http=http)
+    contacts_response = (
+        service.people()
+        .connections()
+        .list(
+            resourceName="people/me",
+            personFields="names,phoneNumbers",
+            sortOrder="LAST_NAME_ASCENDING",
+        )
+        .execute()
+    )
+
     user_config = asteriskhelp.read_config(USER_CONFIG_FILE)
 
-    for user_name, user_dict in user_config["users"].items():
-        # OAuth2
-        gd_client = gdata.contacts.client.ContactsClient()
-        oauth2_creds = gdata.gauth.OAuth2Token(
-            client_id=oauth_config["client_id"],
-            client_secret=oauth_config["client_secret"],
-            scope=oauth_config["scope"],
-            user_agent=oauth_config["user_agent"],
-            access_token=user_dict["access_token"],
-            refresh_token=user_dict["refresh_token"],
-        )
-        oauth2_creds.authorize(gd_client)
+    phonebook = contacts_to_pages(user_config, contacts_response)
+    build_cisco_phonebook(user_config, phonebook)
 
-        query = gdata.contacts.client.ContactsQuery()
-        query.max_results = 1000
 
-        feed = gd_client.GetContacts(q=query)
+def contacts_to_pages(user_config, contacts_response):
+    phonebook = []
 
-        phonebook = []
-
-        # for each phone number in the contacts
-        for i, entry in enumerate(feed.entry):
-            for phone in entry.phone_number:
-                # Strip out any non numeric characters
-                phone.text = re.sub(r"\D", "", phone.text)
-
-                if user_config["country_code"] != "":
-                    phone.text = re.sub(
-                        rf"^\+?{user_config['country_code']}", "", phone.text
-                    )
-
-                phone.text = re.sub(r"^", user_config["dialout_prefix"], phone.text)
-
-                utf8_string = unidecode.unidecode(entry.title.text + ":::" + phone.text)
-                phonebook.append(utf8_string)
-
-        phonebook.sort()
-
-        # just for convenience
-        cisco = user_config["cisco_directory"]
-
-        pages = int(
-            math.ceil(
-                (len(phonebook) + 0.0) / (int(cisco["max_entries_per_page"]) + 0.0)
-            )
+    for i, contact in enumerate(contacts_response["connections"]):
+        display_name = (
+            contact["names"][0]["displayName"]
+            if len(contact["names"]) > 0
+            else "Unknown"
         )
 
-        # remove the old phonebook if we'll be creating new pages
-        # only really an issue if the new phonebook is smaller by at least one page
-        if pages > 0:
-            os.chdir(cisco["output_directory"])
-            files = glob.glob(f"{cisco['filename_base']}*{cisco['filename_extension']}")
-            for f in files:
-                os.remove(f)
+        phone_number_list = contact.get("phoneNumbers")
+        if not phone_number_list:
+            continue
 
-        for i in range(pages):
-            idx_start = i * int(cisco["max_entries_per_page"])
-            idx_stop = (i + 1) * int(cisco["max_entries_per_page"])
-            create_ciscoipphonedirectory_file(
-                phonebook[idx_start:idx_stop],
-                cisco["filename_base"],
-                cisco["filename_extension"],
-                cisco["output_directory"],
-                cisco["base_url"],
-                i,
-                pages,
-            )
+        for phone in phone_number_list:
+            if not phone.get("canonicalForm"):
+                # consider using "value" instead
+                continue
+
+            phone_string = re.sub(r"\D", "", phone["canonicalForm"])
+
+            if len(phone_string) != 11 or not phone_string.startswith("1"):
+                # only support US phone numbers for now
+                continue
+
+            if user_config["country_code"] != "":
+                phone_string = re.sub(
+                    rf"^\+?{user_config['country_code']}", "", phone_string
+                )
+
+            phone_string = re.sub(r"^", user_config["dialout_prefix"], phone_string)
+
+            utf8_string = unidecode.unidecode(f"{display_name}:::{phone_string}")
+            phonebook.append(utf8_string)
+
+    return phonebook
+
+
+def build_cisco_phonebook(user_config, phonebook):
+    # just for convenience
+    cisco = user_config["cisco_directory"]
+
+    pages = int(
+        math.ceil((len(phonebook) + 0.0) / (int(cisco["max_entries_per_page"]) + 0.0))
+    )
+
+    # remove the old phonebook if we'll be creating new pages
+    # only really an issue if the new phonebook is smaller by at least one page
+    if pages > 0:
+        os.chdir(cisco["output_directory"])
+        files = glob.glob(f"{cisco['filename_base']}*{cisco['filename_extension']}")
+        for f in files:
+            os.remove(f)
+
+    for i in range(pages):
+        idx_start = i * int(cisco["max_entries_per_page"])
+        idx_stop = (i + 1) * int(cisco["max_entries_per_page"])
+        create_ciscoipphonedirectory_file(
+            phonebook[idx_start:idx_stop],
+            cisco["filename_base"],
+            cisco["filename_extension"],
+            cisco["output_directory"],
+            cisco["base_url"],
+            i,
+            pages,
+        )
 
 
 def print_dictionary(book):
@@ -157,13 +185,13 @@ def create_ciscoipphonedirectory_file(
         )
 
     # end the xml document and save it
-    uglyXML = directory.toprettyxml(indent="  ")
+    ugly_xml = directory.toprettyxml(indent="  ")
     text_re = re.compile(r">\n\s+([^<>\s].*?)\n\s+</", re.DOTALL)
-    prettyXML = text_re.sub(r">\g<1></", uglyXML)
+    pretty_xml = text_re.sub(r">\g<1></", ugly_xml)
 
     filename = base_directory + filename_base + str(page_number) + filename_extension
     output_xml = open(filename, "w")
-    output_xml.write(prettyXML)
+    output_xml.write(pretty_xml)
     output_xml.close()
 
     os.chmod(filename, 0o0644)
