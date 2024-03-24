@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 #
 # See README.md for configuration information
 
@@ -51,7 +51,7 @@ def main():
 
                 if user_config["country_code"] != "":
                     phone.text = re.sub(
-                        fr"^\+?{user_config['country_code']}", "", phone.text
+                        rf"^\+?{user_config['country_code']}", "", phone.text
                     )
 
                 phone.text = re.sub(r"^", user_config["dialout_prefix"], phone.text)

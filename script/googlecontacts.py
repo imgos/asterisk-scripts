@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 """Get Google Contacts
 
 Usage: google_contacts.py [--noauth_local_webserver]
@@ -6,29 +6,27 @@ Usage: google_contacts.py [--noauth_local_webserver]
 Options:
     --noauth_local_webserver                  passed on to google auth
 """
+import apiclient
+import argparse
 import docopt
 import httplib2
+import oauth2client.client
+import oauth2client.file
+import oauth2client.tools
 import subprocess
 import unidecode
-
-from apiclient import discovery
-from argparse import Namespace
-from oauth2client import client
-from oauth2client import tools
-from oauth2client.file import Storage
 
 ###
 
 
-APPLICATION_NAME = "Asterisk DB Updater"
+APPLICATION_NAME = "Asterisk Contacts Downloader"
 
 # If modifying these scopes, delete your previously saved credentials
 SCOPES = [
     "https://www.googleapis.com/auth/contacts.readonly",
-    "https://www.googleapis.com/auth/people.readonly",
 ]
 
-OAUTH_CONFIG_FILE = "/etc/asterisk-scripts/asterisk_client_secrets.json"
+OAUTH_CONFIG_FILE = "/etc/asterisk-scripts/client_secret.json"
 OAUTH_TOKEN_FILE = "/etc/asterisk-scripts/asterisk_script_tokens.json"
 
 
@@ -44,20 +42,20 @@ def get_credentials(flags):
     :param flags: oauth flags
     :return: the obtained credentials
     """
-    store = Storage(OAUTH_TOKEN_FILE)
+    store = oauth2client.file.Storage(OAUTH_TOKEN_FILE)
     credentials = store.get()
     if not credentials or credentials.invalid:
-        flow = client.flow_from_clientsecrets(OAUTH_CONFIG_FILE, SCOPES)
+        flow = oauth2client.client.flow_from_clientsecrets(OAUTH_CONFIG_FILE, SCOPES)
         flow.user_agent = APPLICATION_NAME
-        credentials = tools.run_flow(flow, store, flags)
+        credentials = oauth2client.tools.run_flow(flow, store, flags)
         print(f"Storing credentials to: {OAUTH_TOKEN_FILE}")
     return credentials
 
 
 def main():
-    """Update asterisk db from google contacts"""
+    """Update asterisk db from Google contacts"""
     opts = docopt.docopt(__doc__)
-    flags = Namespace(
+    flags = argparse.Namespace(
         auth_host_name="localhost",
         auth_host_port=[8080, 8090],
         logging_level="ERROR",
@@ -70,7 +68,7 @@ def main():
     if opts["--noauth_local_webserver"]:
         return
 
-    service = discovery.build("people", "v1", http=http)
+    service = apiclient.discovery.build("people", "v1", http=http)
     contacts_response = (
         service.people()
         .connections()
