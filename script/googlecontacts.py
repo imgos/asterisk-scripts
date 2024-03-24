@@ -87,7 +87,15 @@ def main():
             else "Unknown"
         )
 
-        for phone in contact["phoneNumbers"]:
+        phone_number_list = contact.get("phoneNumbers")
+        if not phone_number_list:
+            continue
+
+        for phone in phone_number_list:
+            if not phone.get("canonicalForm"):
+                # consider using "value" instead
+                continue
+
             ast_cmd = f'database put cidname {phone["canonicalForm"]} "{display_name}"'
             subprocess.run(["asterisk", "-rx", unidecode.unidecode(ast_cmd)])
 
